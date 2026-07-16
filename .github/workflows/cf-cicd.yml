@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Build and Deploy
     environment:
-      name: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+      name: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,49 +46,30 @@ jobs:
           PUBLIC_API_BASE_URL: ${{ secrets.PUBLIC_API_BASE_URL }}
         run: bun run build
 
-      - name: Formulate Deploy Message
-        id: vars
-        run: |
-          # Safely clean and format commit message
-          msg=$(git log -1 --pretty=%s | tr -d '"\n\r')
-          if [ -z "$msg" ]; then
-            msg="Manual deploy by ${{ github.actor }}"
-          fi
-          echo "commit_msg=$msg" >> "$GITHUB_OUTPUT"
-
-      # --- STEP FOR BOTH BRANCHES ---
-      # Both branches upload code to the exact same 'firstdate2026-frontend' registry
-      - name: Upload Version to Cloudflare
-        id: upload
+      # --- MAIN BRANCH -> firstdate2026-frontend (www.cufirstdate2026.com) ---
+      - name: Deploy to Production
+        if: github.ref_name == 'main'
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: >
-            versions upload
-            --message "${{ steps.vars.outputs.commit_msg }}"
-            --tag "${{ github.actor }}-${{ github.sha }}"
-            --preview-alias "${{ github.ref_name }}-preview"
+          command: deploy
           packageManager: bun
 
-      # --- DEV BRANCH ONLY ---
-      # Prints out the preview link generated explicitly inside firstdate2026-frontend
-      - name: Output Dev Preview Link
+      # --- DEV BRANCH -> firstdate2026-frontend-staging (staging.cufirstdate2026.com) ---
+      - name: Deploy to Staging
         if: github.ref_name == 'dev'
-        run: |
-          echo "✨ Code uploaded to firstdate2026-frontend!"
-          echo "🔗 Preview URL is: https://dev-firstdate2026-frontend.<subdomain>.workers.dev"
-
-      # --- MAIN BRANCH ONLY ---
-      # Only the main branch executes the full production deployment sequence to the custom domain
-      - name: Promote to Production (Main Branch Only)
-        if: github.ref_name == 'main'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: >
-            versions deploy
-            --version-tag "${{ github.actor }}-${{ github.sha }}"
-            --yes
+          command: deploy --env staging
           packageManager: bun
+
+      - name: Print Deployed URL
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "🚀 Production deployed: https://www.cufirstdate2026.com"
+          else
+            echo "🚀 Staging deployed: https://staging.cufirstdate2026.com"
+          fi

@@ -29,4 +29,32 @@
       "head_sampling_rate": 1,
     },
   },
+
+  // Separate "page"/Worker for staging, deployed with `wrangler deploy --env staging`
+  "env": {
+    "staging": {
+      "name": "firstdate2026-frontend-staging",
+      "routes": [
+        {
+          "pattern": "staging.cufirstdate2026.com",
+          "zone_name": "cufirstdate2026.com",
+        },
+      ],
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "logs": {
+          "enabled": true,
+          "head_sampling_rate": 1,
+          "persist": true,
+          "invocation_logs": true,
+        },
+        "traces": {
+          "enabled": false,
+          "persist": true,
+          "head_sampling_rate": 1,
+        },
+      },
+    },
+  },
 }
